@@ -14,6 +14,15 @@ type ReminderState = {
 const userStates = new Map<number, string>();
 const reminderStates = new Map<number, ReminderState>();
 
+async function applyTimezoneOffset(
+  chatId: number,
+  hour: number
+): Promise<number> {
+  const serverTimezone = new Date().getTimezoneOffset() / 60;
+  const timezone = await db.getUserTimezone(chatId);
+  return hour + Number(timezone) - serverTimezone;
+}
+
 // Функции для работы с датами
 function getNextDayAt9AM(): Date {
   const tomorrow = new Date();
@@ -276,11 +285,13 @@ bot.callbackQuery(/^reminder_(tomorrow|monday|custom)$/, async (ctx) => {
 
   if (action === "tomorrow") {
     state.selectedDate = getNextDayAt9AM();
+    state.selectedDate.setHours(await applyTimezoneOffset(chatId, 9));
     await ctx.api.editMessageText(chatId, messageId, "Выберите час:", {
       reply_markup: createTimeKeyboard(),
     });
   } else if (action === "monday") {
     state.selectedDate = getNextMondayAt9AM();
+    state.selectedDate.setHours(await applyTimezoneOffset(chatId, 9));
     await ctx.api.editMessageText(chatId, messageId, "Выберите час:", {
       reply_markup: createTimeKeyboard(),
     });
@@ -332,7 +343,7 @@ bot.callbackQuery(/^time_hour_(\d+)$/, async (ctx) => {
   const state = reminderStates.get(chatId);
 
   if (state && state.selectedDate) {
-    state.selectedDate.setHours(hour);
+    state.selectedDate.setHours(await applyTimezoneOffset(chatId, hour));
     state.selectedHour = hour;
 
     await ctx.api.editMessageText(chatId, messageId, "Выберите минуты:", {

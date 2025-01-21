@@ -22,7 +22,7 @@
   "scripts": {
     "build": "webpack --config webpack.config.cjs",
     "start": "node dist/bot.js",
-    "dev": "webpack --watch --config webpack.config.cjs"
+    "dev": "nodemon bot.ts"
   },
   "author": "",
   "license": "ISC",
