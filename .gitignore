@@ -2,4 +2,6 @@ node_modules
 .env
 .vscode
 *.js
-*.db
+!webpack.config.js
+pml_v2.db
+dist/

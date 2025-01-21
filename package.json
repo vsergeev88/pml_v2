@@ -3,8 +3,12 @@
     "@types/node": "^22.10.1",
     "@types/node-fetch": "^2.6.12",
     "nodemon": "^3.1.7",
+    "ts-loader": "^9.5.2",
     "ts-node": "^10.9.2",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.3",
+    "webpack": "^5.97.1",
+    "webpack-cli": "^6.0.1",
+    "webpack-node-externals": "^3.0.0"
   },
   "dependencies": {
     "@types/sqlite3": "^3.1.11",
@@ -16,8 +20,9 @@
   "version": "1.0.0",
   "main": "bot.js",
   "scripts": {
-    "start": "npx tsc && node bot.js",
-    "dev": "nodemon bot.ts"
+    "build": "webpack --config webpack.config.cjs",
+    "start": "node dist/bot.js",
+    "dev": "webpack --watch --config webpack.config.cjs"
   },
   "author": "",
   "license": "ISC",

@@ -143,6 +143,36 @@ bot.command("timezone", async (ctx) => {
   }
 });
 
+// Команда /reminders
+bot.command("reminders", async (ctx) => {
+  const chatId = ctx.chat.id;
+  try {
+    const reminders = await db.getUserReminders(chatId);
+
+    if (reminders.length === 0) {
+      await ctx.reply("У вас нет активных напоминаний.");
+      return;
+    }
+
+    const remindersList = reminders
+      .map((reminder) => {
+        const dateStr = reminder.remind_at.toLocaleString("ru-RU", {
+          day: "2-digit",
+          month: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+        return `📝 ${dateStr}\n${reminder.message}`;
+      })
+      .join("\n\n");
+
+    await ctx.reply(`Ваши напоминания:\n\n${remindersList}`);
+  } catch (error) {
+    console.error("Ошибка при получении списка напоминаний:", error);
+    await ctx.reply("Произошла ошибка при получении списка напоминаний.");
+  }
+});
+
 // Обработчик нажатия на кнопку установки часового пояса
 bot.callbackQuery("set_my_timezone", async (ctx) => {
   const chatId = ctx.chat?.id;
@@ -359,36 +389,6 @@ bot.callbackQuery(/^time_min_(\d+)$/, async (ctx) => {
   }
 
   await ctx.answerCallbackQuery();
-});
-
-// Команда /reminders
-bot.command("reminders", async (ctx) => {
-  const chatId = ctx.chat.id;
-  try {
-    const reminders = await db.getUserReminders(chatId);
-
-    if (reminders.length === 0) {
-      await ctx.reply("У вас нет активных напоминаний.");
-      return;
-    }
-
-    const remindersList = reminders
-      .map((reminder) => {
-        const dateStr = reminder.remind_at.toLocaleString("ru-RU", {
-          day: "2-digit",
-          month: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-        });
-        return `📝 ${dateStr}\n${reminder.message}`;
-      })
-      .join("\n\n");
-
-    await ctx.reply(`Ваши напоминания:\n\n${remindersList}`);
-  } catch (error) {
-    console.error("Ошибка при получении списка напоминаний:", error);
-    await ctx.reply("Произошла ошибка при получении списка напоминаний.");
-  }
 });
 
 bot.start();
