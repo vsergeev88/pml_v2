@@ -1,4 +1,4 @@
-import { Bot, InlineKeyboard, Context } from "grammy";
+import { Bot, InlineKeyboard, Context, Api, RawApi } from "grammy";
 import * as dotenv from "dotenv";
 import { db } from "./src/db";
 
@@ -14,21 +14,63 @@ type ReminderState = {
 const userStates = new Map<number, string>();
 const reminderStates = new Map<number, ReminderState>();
 
-async function applyTimezoneOffset(chatId: number, date: Date): Promise<Date> {
+function getLocaleDate(date: Date, locale: string = "ru-RU"): string {
+  return date.toLocaleString(locale, {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+async function saveReminder(
+  chatId: number,
+  state: ReminderState,
+  api: Api<RawApi>,
+  messageId: number
+) {
+  if (!state.selectedDate) {
+    console.error("No selected date");
+    return;
+  }
+  try {
+    const corrctedDate = await applyTimezoneOffset(chatId, state.selectedDate);
+    // Сохраняем напоминание в базу
+    await db.createReminder({
+      chat_id: chatId,
+      message: state.messageText,
+      remind_at: corrctedDate,
+    });
+    await api.editMessageText(
+      chatId,
+      messageId,
+      `✅ Напоминание "${state.messageText}" установлено на ${getLocaleDate(
+        state.selectedDate
+      )}`
+    );
+    // Очищаем состояние
+    reminderStates.delete(chatId);
+  } catch (error) {
+    console.error("Ошибка при создании напоминания:", error);
+  }
+}
+
+async function getChatTimezoneOffset(chatId: number): Promise<number> {
   const timezone = await db.getUserTimezone(chatId);
-  if (!timezone) return date;
+  const serverTimezone = new Date().getTimezoneOffset() / 60;
+  if (!timezone) return 0;
+  return timezone + serverTimezone;
+}
+
+async function applyTimezoneOffset(chatId: number, date: Date): Promise<Date> {
+  const timezoneOffset = await getChatTimezoneOffset(chatId);
+  if (!timezoneOffset) return date;
 
   // Create a new date to avoid modifying the original
   const adjustedDate = new Date(date);
 
-  // Get the server's timezone offset in hours
-  const serverOffset = -adjustedDate.getTimezoneOffset() / 60;
-
-  // Calculate the difference between user's timezone and server timezone
-  const offsetDiff = timezone - serverOffset;
-
   // Adjust the hours by the timezone difference
-  adjustedDate.setHours(adjustedDate.getHours() - offsetDiff);
+  adjustedDate.setHours(adjustedDate.getHours() - timezoneOffset);
 
   return adjustedDate;
 }
@@ -91,7 +133,6 @@ async function checkAndSendReminders() {
   try {
     const now = new Date();
     const reminders = await db.getPendingReminders(now);
-
     for (const reminder of reminders) {
       try {
         await bot.api.sendMessage(
@@ -167,6 +208,7 @@ bot.command("reminders", async (ctx) => {
   const chatId = ctx.chat.id;
   try {
     const reminders = await db.getUserReminders(chatId);
+    const timezone = await db.getUserTimezone(chatId);
 
     if (reminders.length === 0) {
       await ctx.reply("У вас нет активных напоминаний.");
@@ -175,12 +217,9 @@ bot.command("reminders", async (ctx) => {
 
     const remindersList = reminders
       .map((reminder) => {
-        const dateStr = reminder.remind_at.toLocaleString("ru-RU", {
-          day: "2-digit",
-          month: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-        });
+        const reminderDate = new Date(reminder.remind_at);
+        reminderDate.setHours(reminderDate.getHours() + Number(timezone) || 0);
+        const dateStr = getLocaleDate(reminderDate);
         return `📝 ${dateStr}\n${reminder.message}`;
       })
       .join("\n\n");
@@ -295,16 +334,13 @@ bot.callbackQuery(/^reminder_(tomorrow|monday|custom)$/, async (ctx) => {
 
   if (action === "tomorrow") {
     state.selectedDate = getNextDayAt9AM();
-    state.selectedDate.setHours(await applyTimezoneOffset(chatId, 9));
-    await ctx.api.editMessageText(chatId, messageId, "Выберите час:", {
-      reply_markup: createTimeKeyboard(),
-    });
+    state.selectedDate.setHours(9);
+    await saveReminder(chatId, state, ctx.api, messageId);
+    return;
   } else if (action === "monday") {
     state.selectedDate = getNextMondayAt9AM();
-    state.selectedDate.setHours(await applyTimezoneOffset(chatId, 9));
-    await ctx.api.editMessageText(chatId, messageId, "Выберите час:", {
-      reply_markup: createTimeKeyboard(),
-    });
+    state.selectedDate.setHours(9);
+    await saveReminder(chatId, state, ctx.api, messageId);
   } else if (action === "custom") {
     const days = getDaysForTwoWeeks();
     const keyboard = new InlineKeyboard();
@@ -353,7 +389,7 @@ bot.callbackQuery(/^time_hour_(\d+)$/, async (ctx) => {
   const state = reminderStates.get(chatId);
 
   if (state && state.selectedDate) {
-    state.selectedDate.setHours(await applyTimezoneOffset(chatId, hour));
+    state.selectedDate.setHours(hour);
     state.selectedHour = hour;
 
     await ctx.api.editMessageText(chatId, messageId, "Выберите минуты:", {
@@ -377,28 +413,7 @@ bot.callbackQuery(/^time_min_(\d+)$/, async (ctx) => {
     state.selectedDate.setMinutes(minutes);
 
     try {
-      // Сохраняем напоминание в базу
-      await db.createReminder({
-        chat_id: chatId,
-        message: state.messageText,
-        remind_at: state.selectedDate,
-      });
-
-      const dateStr = state.selectedDate.toLocaleString("ru-RU", {
-        day: "2-digit",
-        month: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-
-      await ctx.api.editMessageText(
-        chatId,
-        messageId,
-        `✅ Напоминание "${state.messageText}" установлено на ${dateStr}`
-      );
-
-      // Очищаем состояние
-      reminderStates.delete(chatId);
+      await saveReminder(chatId, state, ctx.api, messageId);
     } catch (error) {
       console.error("Ошибка при создании напоминания:", error);
       await ctx.api.editMessageText(
