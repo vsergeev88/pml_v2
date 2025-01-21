@@ -1,8 +1,25 @@
 {
   "devDependencies": {
+    "@types/node": "^22.10.1",
+    "@types/node-fetch": "^2.6.12",
+    "nodemon": "^3.1.7",
+    "ts-node": "^10.9.2",
     "typescript": "^5.7.2"
   },
   "dependencies": {
-    "grammy": "^1.32.0"
-  }
+    "@types/sqlite3": "^3.1.11",
+    "dotenv": "^16.4.6",
+    "grammy": "^1.32.0",
+    "sqlite3": "^5.1.7"
+  },
+  "name": "pml_v2",
+  "version": "1.0.0",
+  "main": "bot.js",
+  "scripts": {
+    "start": "npx tsc && node bot.js",
+    "dev": "nodemon bot.ts"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": ""
 }
