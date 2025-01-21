@@ -14,13 +14,23 @@ type ReminderState = {
 const userStates = new Map<number, string>();
 const reminderStates = new Map<number, ReminderState>();
 
-async function applyTimezoneOffset(
-  chatId: number,
-  hour: number
-): Promise<number> {
-  const serverTimezone = new Date().getTimezoneOffset() / 60;
+async function applyTimezoneOffset(chatId: number, date: Date): Promise<Date> {
   const timezone = await db.getUserTimezone(chatId);
-  return hour + Number(timezone) - serverTimezone;
+  if (!timezone) return date;
+
+  // Create a new date to avoid modifying the original
+  const adjustedDate = new Date(date);
+
+  // Get the server's timezone offset in hours
+  const serverOffset = -adjustedDate.getTimezoneOffset() / 60;
+
+  // Calculate the difference between user's timezone and server timezone
+  const offsetDiff = timezone - serverOffset;
+
+  // Adjust the hours by the timezone difference
+  adjustedDate.setHours(adjustedDate.getHours() - offsetDiff);
+
+  return adjustedDate;
 }
 
 // Функции для работы с датами
