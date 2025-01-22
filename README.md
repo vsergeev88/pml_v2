@@ -26,7 +26,7 @@ To run this bot locally, follow these steps:
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your-username/ping-me-later-bot.git
+   git clone https://github.com/vsergeev88/pml_v2.git
    cd ping-me-later-bot
    ```
 
