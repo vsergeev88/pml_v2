@@ -37,7 +37,7 @@ To run this bot locally, follow these steps:
 
 3. Create a `.env` file and add your Telegram Bot API token:
    ```env
-   BOT_TOKEN=your-telegram-bot-token
+   TELEGRAM_BOT_TOKEN=your-telegram-bot-token
    ```
 
 4. Start the bot:
